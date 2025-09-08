@@ -26,9 +26,9 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({ children }) => {
   // Never show background image if we have any video (including default)
   const shouldShowBackgroundImage = !hasVideo && data.backgroundImage;
 
-  // Configure simple video system - always muted, no conflicts
+  // Configure video system with audio
   useEffect(() => {
-    console.log('VideoBackground: Initializing simple video system', { 
+    console.log('VideoBackground: Initializing video system with audio', { 
       videoUrl: videoUrl, 
       hasVideo: hasVideo 
     });
@@ -46,14 +46,24 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({ children }) => {
       // Add basic event listeners
       video.addEventListener('ended', handleVideoEnd);
       
-      // Force immediate play - always muted to avoid conflicts
+      // Force immediate play with audio
       const forcePlay = async () => {
         try {
-          video.muted = true;
+          // First try with audio
+          video.muted = false;
+          video.volume = 0.3;
           await video.play();
-          console.log('Video playing muted - infinite loop active');
+          console.log('Video playing with audio - infinite loop active');
         } catch (error) {
-          console.error('Video failed to start:', error);
+          console.log('Autoplay with audio blocked - trying muted fallback');
+          // Fallback to muted if autoplay is blocked
+          video.muted = true;
+          try {
+            await video.play();
+            console.log('Video playing muted - infinite loop active');
+          } catch (mutedError) {
+            console.error('Video failed to start:', mutedError);
+          }
         }
       };
       
@@ -76,7 +86,6 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({ children }) => {
           className="absolute inset-0 w-full h-full object-cover"
           autoPlay
           loop
-          muted
           playsInline
           preload="auto"
           poster={data.backgroundImage || undefined}
