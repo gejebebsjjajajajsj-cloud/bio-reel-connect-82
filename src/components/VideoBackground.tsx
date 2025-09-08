@@ -1,7 +1,5 @@
-import React, { useEffect, useRef, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { useStore } from '@/contexts/StoreContext';
-import { Volume2, VolumeX } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import storeBackground from '@/assets/store-background.jpg';
 import backgroundVideo from '@/assets/background-video.mp4';
 
@@ -12,8 +10,6 @@ interface VideoBackgroundProps {
 const VideoBackground: React.FC<VideoBackgroundProps> = ({ children }) => {
   const { data } = useStore();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isMuted, setIsMuted] = useState(true);
-  const [showAudioControl, setShowAudioControl] = useState(false);
   
   // Memoize video URL to prevent unnecessary re-renders  
   const videoUrl = useMemo(() => {
@@ -30,83 +26,34 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({ children }) => {
   // Never show background image if we have any video (including default)
   const shouldShowBackgroundImage = !hasVideo && data.backgroundImage;
 
-  // Função para controlar áudio
-  const toggleAudio = () => {
-    if (videoRef.current) {
-      const video = videoRef.current;
-      const newMutedState = !isMuted;
-      setIsMuted(newMutedState);
-      video.muted = newMutedState;
-      video.volume = newMutedState ? 0 : 0.3;
-      console.log(`Audio ${newMutedState ? 'muted' : 'unmuted'}`);
-    }
-  };
-
-  // Configure ultra-robust video system - NEVER lets video stop
+  // Configure simple video system - always muted, no conflicts
   useEffect(() => {
-    console.log('VideoBackground: Initializing bulletproof video system', { 
+    console.log('VideoBackground: Initializing simple video system', { 
       videoUrl: videoUrl, 
       hasVideo: hasVideo 
     });
     
     if (videoRef.current) {
       const video = videoRef.current;
-      let isIntentionalPause = false;
       
-      // Ultra-robust video end handler - ensures infinite loop
+      // Simple video end handler - ensures infinite loop
       const handleVideoEnd = () => {
         console.log('Video ended - restarting immediately for infinite loop');
         video.currentTime = 0;
         video.play().catch(e => console.error('Loop restart failed:', e));
       };
       
-      // Smart pause detection - only restart if not intentionally paused
-      const handlePause = () => {
-        if (!isIntentionalPause && video.readyState >= 2) {
-          setTimeout(() => {
-            if (!isIntentionalPause && video.paused) {
-              console.log('Video paused unexpectedly - restarting');
-              video.play().catch(e => console.error('Auto-restart failed:', e));
-            }
-          }, 100);
-        }
-      };
-      
-      // Prevent video from ever being truly paused
-      const preventPause = (e: Event) => {
-        if (!isIntentionalPause) {
-          e.preventDefault();
-          setTimeout(() => video.play(), 10);
-        }
-      };
-      
-      // Add bulletproof event listeners
+      // Add basic event listeners
       video.addEventListener('ended', handleVideoEnd);
-      video.addEventListener('pause', handlePause);
-      video.addEventListener('suspend', preventPause);
-      video.addEventListener('stalled', () => video.load());
       
-      // Force immediate play with progressive fallbacks
+      // Force immediate play - always muted to avoid conflicts
       const forcePlay = async () => {
         try {
-          // Primeiro tenta com áudio baixo
-          video.muted = false;
-          video.volume = 0.3;
-          await video.play();
-          console.log('Video playing with audio - infinite loop active');
-          setIsMuted(false);
-          setShowAudioControl(true);
-        } catch (error) {
-          console.log('Autoplay com áudio bloqueado - usando fallback mudo');
           video.muted = true;
-          setIsMuted(true);
-          try {
-            await video.play();
-            console.log('Video playing muted - infinite loop active');
-            setShowAudioControl(true);
-          } catch (mutedError) {
-            console.error('Critical: Video failed to start:', mutedError);
-          }
+          await video.play();
+          console.log('Video playing muted - infinite loop active');
+        } catch (error) {
+          console.error('Video failed to start:', error);
         }
       };
       
@@ -115,11 +62,7 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({ children }) => {
       
       // Cleanup
       return () => {
-        isIntentionalPause = true;
         video.removeEventListener('ended', handleVideoEnd);
-        video.removeEventListener('pause', handlePause);
-        video.removeEventListener('suspend', preventPause);
-        video.removeEventListener('stalled', () => video.load());
       };
     }
   }, [videoUrl, hasVideo, data.backgroundVideo]);
@@ -133,7 +76,7 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({ children }) => {
           className="absolute inset-0 w-full h-full object-cover"
           autoPlay
           loop
-          muted={isMuted}
+          muted
           playsInline
           preload="auto"
           poster={data.backgroundImage || undefined}
@@ -163,19 +106,6 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({ children }) => {
       
       {/* Gradient overlay when video exists */}
       {hasVideo && <div className="absolute inset-0 bg-gradient-overlay" />}
-      
-      {/* Audio Control Button */}
-      {hasVideo && showAudioControl && (
-        <Button
-          variant="outline"
-          size="icon"
-          className="absolute top-4 right-4 z-20 bg-background/20 backdrop-blur-sm border-white/20 text-white hover:bg-white/10 transition-all duration-300"
-          onClick={toggleAudio}
-          aria-label={isMuted ? 'Ativar som' : 'Desativar som'}
-        >
-          {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-        </Button>
-      )}
       
       {/* Content */}
       <div className="relative z-10">
